@@ -1,7 +1,12 @@
 const fileElement = document.getElementById('file');
 const uploadElement = document.getElementById('upload');
+const statusElement = document.getElementById('status');
 
-const sliceSize = 1000 * 1028;
+const sliceSize = 500 * 1028;
+
+function updateStatus(text) {
+    statusElement.innerHTML = text;
+}
 
 async function startUpload(fileExtension) {
     const response = await fetch('/api/upload/start', {
@@ -10,6 +15,13 @@ async function startUpload(fileExtension) {
             'content-type': 'application/json',
         },
         body: JSON.stringify({ fileExtension })
+    });
+    return response.json();
+}
+
+async function endUpload(uploadId) {
+    const response = await fetch(`/api/upload/end/${uploadId}`, {
+        method: 'POST',
     });
     return response.json();
 }
@@ -25,13 +37,15 @@ uploadElement.addEventListener('click', async () => {
             return new Promise((resolve, reject) => {
                 const nextSlice = sliceIndex + sliceSize + 1;
                 const blob = file.slice(sliceIndex, nextSlice);
+
+                updateStatus(`upload file: ${Math.min(Math.round(nextSlice / file.size * 100), 100)}%`)
                 
                 reader.onloadend = async function (event) {
                     if (event.target.readyState !== FileReader.DONE) {
                         return reject(new Error('was still busy'));
                     }
 
-                    const response = await fetch(`/api/upload/push/${uploadInfo.id}/${chunkNumber}`, {
+                    const response = await fetch(`/api/upload/push/${uploadInfo.id}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/octet-stream',
@@ -49,6 +63,9 @@ uploadElement.addEventListener('click', async () => {
             })
         }
     
-        uploadChunk();
+        uploadChunk().then(() => {
+            updateStatus('done uploading');
+            endUpload(uploadInfo.id);
+        });
     }
 });

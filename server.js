@@ -21,17 +21,17 @@ app.post('/api/upload/start', (req, res, next) => {
     const uploadInfo = {
         id: uuid(),
         timestamp: Date.now(),
+        extension: req.body.fileExtension,
         uploading: true,
-        extension: req.body.fileExtension
     };
     uploadDatabase.setKey(uploadInfo.id, uploadInfo);
-    uploadDatabase.save();
+    uploadDatabase.save(true);
     res.writeHead(200, {
         'Content-Type': 'application/json',
     });
     res.end(JSON.stringify(uploadInfo));
 });
-app.post('/api/upload/push/:uploadId/:chunkNumber', (req, res) => {
+app.post('/api/upload/push/:uploadId', (req, res) => {
     const uploadInfo = uploadDatabase.getKey(req.params.uploadId);
     let collectedData = ''
     req.on('data', (data) => {
@@ -45,5 +45,15 @@ app.post('/api/upload/push/:uploadId/:chunkNumber', (req, res) => {
         });
     });
 });
+app.post('/api/upload/end/:uploadId', (req, res, next) => {
+    const uploadId = req.params.uploadId;
+    const uploadInfo = uploadDatabase.getKey(uploadId);
+    if (uploadInfo) {
+        const updatedUploadInfo = { ...uploadInfo, uploading: false };
+        uploadDatabase.setKey(uploadId, updatedUploadInfo);
+        uploadDatabase.save(true);
+        res.json(uploadInfo);
+    } else next();
+})
 
 server.listen(3000, () => console.log('listening at :3000'));
